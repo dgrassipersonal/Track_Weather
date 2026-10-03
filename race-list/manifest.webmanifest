@@ -1,0 +1,14 @@
+{
+  "name":"Grassi Racing Race List",
+  "short_name":"Race List",
+  "id":"/Track_Weather/race-list/",
+  "start_url":"/Track_Weather/race-list/",
+  "scope":"/Track_Weather/race-list/",
+  "display":"standalone",
+  "background_color":"#0b1020",
+  "theme_color":"#233b61",
+  "icons":[
+    {"src":"/Track_Weather/apple-touch-icon.png","sizes":"180x180","type":"image/png","purpose":"any"},
+    {"src":"/Track_Weather/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"}
+  ]
+}
