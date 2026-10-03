@@ -57,7 +57,78 @@ async function getNws(track){
   return fetchJson(p.properties.forecastHourly,{headers:{Accept:'application/geo+json'}});
 }
 function mean(a){const v=a.filter(Number.isFinite);return v.length?v.reduce((x,y)=>x+y,0)/v.length:0}
+function weightedMean(values,weights){
+  let sum=0,total=0;
+  values.forEach((v,i)=>{if(Number.isFinite(v)){const w=Number(weights[i])||0;sum+=v*w;total+=w;}});
+  return total?sum/total:mean(values);
+}
 function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
+function addDays(dateString,days){
+  const d=new Date(dateString+'T12:00:00');
+  d.setDate(d.getDate()+days);
+  return isoDateLocal(d);
+}
+function forecastLeadDays(date){
+  const today=new Date(isoDateLocal()+'T12:00:00');
+  const target=new Date(date+'T12:00:00');
+  return clamp(Math.round((target-today)/86400000),1,6);
+}
+function raceWindowTotals(data,field){
+  const totals={};
+  const times=data.hourly?.time||[],values=data.hourly?.[field]||[];
+  times.forEach((t,i)=>{
+    const h=Number(t.slice(11,13)),v=Number(values[i]);
+    if(h<7||h>19||!Number.isFinite(v))return;
+    const d=t.slice(0,10);
+    totals[d]=(totals[d]||0)+v;
+  });
+  return totals;
+}
+function equalModelWeights(){
+  const w=1/MODELS.length;
+  return Object.fromEntries(MODELS.map(m=>[m.id,{weight:w,skill:null,samples:0}]));
+}
+async function getHistoricalWeights(track,date){
+  const lead=forecastLeadDays(date);
+  const end=addDays(isoDateLocal(),-2);
+  const start=addDays(end,-29);
+  const actualQs=new URLSearchParams({
+    latitude:track.lat,longitude:track.lon,start_date:start,end_date:end,
+    hourly:'precipitation',precipitation_unit:'inch',timezone:'America/New_York'
+  });
+  try{
+    const actual=await fetchJson('https://archive-api.open-meteo.com/v1/archive?'+actualQs.toString());
+    const actualTotals=raceWindowTotals(actual,'precipitation');
+    const field='precipitation_previous_day'+lead;
+    const results=await Promise.all(MODELS.map(async m=>{
+      const qs=new URLSearchParams({
+        latitude:track.lat,longitude:track.lon,start_date:start,end_date:end,
+        hourly:field,precipitation_unit:'inch',timezone:'America/New_York',models:m.id
+      });
+      const data=await fetchJson('https://previous-runs-api.open-meteo.com/v1/forecast?'+qs.toString());
+      const forecastTotals=raceWindowTotals(data,field);
+      const scores=[];
+      Object.keys(actualTotals).forEach(d=>{
+        if(!Number.isFinite(forecastTotals[d]))return;
+        const actualRain=actualTotals[d],forecastRain=forecastTotals[d];
+        const actualWet=actualRain>=.01,forecastWet=forecastRain>=.01;
+        let eventScore=1;
+        if(actualWet&&!forecastWet)eventScore=0;
+        else if(!actualWet&&forecastWet)eventScore=.5;
+        const amountScore=1-Math.min(Math.abs(forecastRain-actualRain)/.25,1);
+        scores.push(eventScore*.8+amountScore*.2);
+      });
+      if(scores.length<7)throw new Error('Not enough historical samples for '+m.label);
+      return {id:m.id,skill:Math.round(mean(scores)*100),samples:scores.length};
+    }));
+    const raw=results.map(r=>Math.pow(Math.max(.25,r.skill/100),3));
+    const total=raw.reduce((a,b)=>a+b,0)||1;
+    return Object.fromEntries(results.map((r,i)=>[r.id,{...r,weight:raw[i]/total,lead}]));
+  }catch(e){
+    console.warn('Historical model weighting unavailable; using equal weights.',e);
+    return equalModelWeights();
+  }
+}
 function calcDA(tempF,rh,pressureHpa){
   if(!Number.isFinite(tempF)||!Number.isFinite(rh)||!Number.isFinite(pressureHpa)) return null;
   const tC=(tempF-32)*5/9;
@@ -92,24 +163,25 @@ function summarizeModel(data,date,label){
   const peak=Math.max(...rows.map(r=>r.pop));
   const total=rows.reduce((s,r)=>s+r.rain,0);
   const wetHours=rows.filter(r=>r.rain>=.01||r.pop>=60).length;
-  return {label,rows,peak,total,wetHours};
+  return {id:arguments[3],label,rows,peak,total,wetHours};
 }
-function aggregateModels(models){
+function aggregateModels(models,skillWeights){
   const len=Math.min(...models.map(m=>m.rows.length));
+  const modelWeights=models.map(m=>skillWeights?.[m.id]?.weight??(1/models.length));
   const rows=[];
   for(let i=0;i<len;i++){
     const set=models.map(m=>m.rows[i]);
     rows.push({
       time:set[0].time,
-      pop:mean(set.map(r=>r.pop)),
-      rain:mean(set.map(r=>r.rain)),
-      temp:mean(set.map(r=>r.temp)),
-      rh:mean(set.map(r=>r.rh)),
-      dew:mean(set.map(r=>r.dew)),
-      pressure:mean(set.map(r=>r.pressure)),
-      wind:mean(set.map(r=>r.wind)),
-      gust:mean(set.map(r=>r.gust)),
-      cloud:mean(set.map(r=>r.cloud))
+      pop:weightedMean(set.map(r=>r.pop),modelWeights),
+      rain:weightedMean(set.map(r=>r.rain),modelWeights),
+      temp:weightedMean(set.map(r=>r.temp),modelWeights),
+      rh:weightedMean(set.map(r=>r.rh),modelWeights),
+      dew:weightedMean(set.map(r=>r.dew),modelWeights),
+      pressure:weightedMean(set.map(r=>r.pressure),modelWeights),
+      wind:weightedMean(set.map(r=>r.wind),modelWeights),
+      gust:weightedMean(set.map(r=>r.gust),modelWeights),
+      cloud:weightedMean(set.map(r=>r.cloud),modelWeights)
     });
   }
   const peak=Math.max(...rows.map(r=>r.pop));
@@ -125,7 +197,7 @@ function aggregateModels(models){
 }
 function nwsForDate(nws,date){
   const rows=(nws.properties?.periods||[]).filter(p=>{
-    const d=p.startTime.slice(0,10),h=new Date(p.startTime).getHours();
+    const d=p.startTime.slice(0,10),h=Number(p.startTime.slice(11,13));
     return d===date&&h>=7&&h<=19;
   });
   return {
@@ -156,9 +228,9 @@ async function load(){
   const track=TRACKS[+trackSelect.value||0],date=dateInput.value;
   $('trackName').textContent=track.name;
   try{
-    const modelPromises=MODELS.map(m=>getOpenMeteoModel(track,date,m.id).then(d=>summarizeModel(d,date,m.label)));
-    const [modelResults,nws]=await Promise.all([Promise.all(modelPromises),getNws(track)]);
-    const s=aggregateModels(modelResults),n=nwsForDate(nws,date),conf=confidence(modelResults,n);
+    const modelPromises=MODELS.map(m=>getOpenMeteoModel(track,date,m.id).then(d=>summarizeModel(d,date,m.label,m.id)));
+    const [modelResults,nws,skillWeights]=await Promise.all([Promise.all(modelPromises),getNws(track),getHistoricalWeights(track,date)]);
+    const s=aggregateModels(modelResults,skillWeights),n=nwsForDate(nws,date),conf=confidence(modelResults,n);
     const blended=clamp(Math.round(s.risk*.75+n.peak*.25),0,100);
     const peakPop=Math.max(s.peak,n.peak);
     const wetSourceCount=modelResults.filter(m=>m.peak>=60||m.total>=.1).length+(n.peak>=60?1:0);
@@ -194,14 +266,17 @@ async function load(){
       (rainStart?'Main weather concern begins around '+fmtTime(rainStart.time)+'. ':'No strong rain signal in the 7 AM–7 PM race window. ')+
       consensusLabel(modelResults,n)+'. '+
       (s.total>=.25?'Model-average rainfall is substantial for a dragstrip. ':'')+
-      'NWS peak rain chance is '+n.peak+'%; model-consensus peak is '+Math.round(s.peak)+'%.';
+      'NWS peak rain chance is '+n.peak+'%; accuracy-weighted model peak is '+Math.round(s.peak)+'%.';
     $('hourlyBody').innerHTML=s.rows.map(r=>{
       const daHr=calcDA(r.temp,r.rh,r.pressure);
       return '<tr><td>'+fmtTime(r.time)+'</td><td>'+Math.round(r.pop)+'%</td><td>'+r.rain.toFixed(2)+'"</td><td>'+Math.round(r.temp)+'°</td><td>'+Math.round(r.rh)+'%</td><td>'+Math.round(r.wind)+' G'+Math.round(r.gust)+'</td><td>'+(daHr==null?'--':daHr.toLocaleString())+'</td></tr>';
     }).join('');
-    const modelHtml=modelResults.map(m=>
-      '<div class="source-row"><div><strong>'+m.label+'</strong><small>'+m.total.toFixed(2)+'" model rainfall</small></div><span class="badge">'+Math.round(m.peak)+'% peak</span></div>'
-    ).join('');
+    const modelHtml=modelResults.map(m=>{
+      const hist=skillWeights[m.id]||{};
+      const weight=Math.round((hist.weight??(1/modelResults.length))*100);
+      const skill=Number.isFinite(hist.skill)?' · '+hist.skill+'/100 recent rain skill':' · equal fallback weight';
+      return '<div class="source-row"><div><strong>'+m.label+'</strong><small>'+m.total.toFixed(2)+'" model rainfall · '+weight+'% model weight'+skill+'</small></div><span class="badge">'+Math.round(m.peak)+'% peak</span></div>';
+    }).join('');
     $('sourceList').innerHTML=
       '<div class="source-row"><div><strong>NWS</strong><small>'+(n.summary||'Official hourly point forecast')+'</small></div><span class="badge">'+n.peak+'% peak</span></div>'+modelHtml;
     $('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
