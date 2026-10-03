@@ -3,58 +3,59 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#233b61">
+  <meta name="theme-color" content="#1b1b1b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Race List">
-  <link rel="manifest" href="./manifest.webmanifest?v=1">
-  <link rel="apple-touch-icon" sizes="180x180" href="/Track_Weather/apple-touch-icon.png">
-  <link rel="apple-touch-icon-precomposed" href="/Track_Weather/apple-touch-icon-precomposed.png">
+  <link rel="manifest" href="./manifest.webmanifest?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=2">
+  <link rel="apple-touch-icon-precomposed" href="./apple-touch-icon.png?v=2">
   <title>Race List</title>
   <style>
-    :root{color-scheme:dark;--bg:#0b1020;--panel:#121b2e;--panel2:#18243b;--line:#2b3b59;--text:#f8fafc;--muted:#a9b6ca;--blue:#233b61;--accent:#65a5ff;--done:#1f6a49;--danger:#c63d46}
+    :root{color-scheme:dark;--bg:#101010;--panel:#181818;--panel2:#242424;--line:#3b3b3b;--text:#ededed;--muted:#aaa;--mid:#5d5d5d;--done:#343434;--danger:#4a4a4a}
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     html{background:var(--bg)}
-    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;background:linear-gradient(180deg,#0d1425 0,#0b1020 100%);color:var(--text);min-height:100vh}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;background:linear-gradient(180deg,#303030 0,#181818 190px,#101010 100%);color:var(--text);min-height:100vh}
     .app{width:min(760px,100%);margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 14px calc(env(safe-area-inset-bottom) + 100px)}
-    .header{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--blue);border:1px solid #34527f;border-radius:18px;padding:16px 16px;margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
-    .brand{display:flex;align-items:center;gap:12px;min-width:0}
-    .brand img{width:74px;height:74px;border-radius:15px;object-fit:cover;flex:none}
-    h1{font-size:clamp(1.65rem,7vw,2.3rem);line-height:1;margin:0;letter-spacing:-.03em}
-    .subtitle{color:#d6e1f1;font-size:.82rem;margin-top:6px}
-    .reset{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:white;border-radius:12px;padding:11px 13px;font-weight:800;font-size:.88rem;cursor:pointer;white-space:nowrap}
-    .section{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin:0 0 16px;box-shadow:0 8px 24px rgba(0,0,0,.16)}
-    .section h2{margin:0;padding:14px 16px;background:var(--panel2);font-size:1.05rem;letter-spacing:.01em;border-bottom:1px solid var(--line)}
-    .item{display:flex;align-items:center;gap:13px;min-height:58px;padding:10px 15px;border-bottom:1px solid rgba(82,103,137,.34);cursor:pointer;user-select:none;transition:background .12s ease,opacity .12s ease}
+    .header{position:relative;display:flex;align-items:center;justify-content:space-between;gap:14px;overflow:hidden;background:linear-gradient(135deg,#595959 0,#383838 46%,#171717 100%);border:1px solid #666;border-radius:18px;padding:14px 16px;margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,.42)}
+    .header:after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,.08),transparent 38%,rgba(0,0,0,.22));pointer-events:none}
+    .brand{display:flex;align-items:center;gap:14px;min-width:0;position:relative;z-index:1}
+    .brand img{width:92px;height:92px;border-radius:15px;object-fit:cover;flex:none;border:1px solid #777;box-shadow:0 5px 15px rgba(0,0,0,.45)}
+    h1{font-size:clamp(1.8rem,7vw,2.55rem);line-height:.95;margin:0;letter-spacing:.02em;font-style:italic;text-transform:uppercase;text-shadow:0 2px 2px #000}
+    .subtitle{color:#c9c9c9;font-size:.82rem;margin-top:7px}
+    .reset{position:relative;z-index:1;border:1px solid #858585;background:linear-gradient(#5d5d5d,#3d3d3d);color:white;border-radius:12px;padding:11px 13px;font-weight:800;font-size:.88rem;cursor:pointer;white-space:nowrap}
+    .section{background:linear-gradient(180deg,#1d1d1d,#151515);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:0 0 16px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+    .section h2{margin:0;padding:14px 16px;background:linear-gradient(90deg,#3e3e3e,#242424);font-size:1.05rem;font-style:italic;text-transform:uppercase;letter-spacing:.035em;border-bottom:1px solid #505050;text-shadow:0 1px #000}
+    .item{display:flex;align-items:center;gap:13px;min-height:58px;padding:10px 15px;border-bottom:1px solid #2b2b2b;cursor:pointer;user-select:none;transition:background .12s ease,opacity .12s ease}
     .item:last-child{border-bottom:0}
-    .item:active{background:#1c2b46}
+    .item:active{background:#303030}
     .item input{position:absolute;opacity:0;pointer-events:none}
-    .box{width:28px;height:28px;border:2px solid #6e83a5;border-radius:8px;display:grid;place-items:center;flex:none;background:#0e1729;transition:.12s ease}
+    .box{width:28px;height:28px;border:2px solid #777;border-radius:7px;display:grid;place-items:center;flex:none;background:#111;transition:.12s ease}
     .box::after{content:"";width:8px;height:14px;border:solid white;border-width:0 3px 3px 0;transform:rotate(45deg) scale(0);margin-top:-3px;transition:.12s ease}
     .label{font-size:1.04rem;font-weight:650;line-height:1.25}
-    .item.done{background:rgba(31,106,73,.22);opacity:.68}
-    .item.done .box{background:var(--done);border-color:#4db881}
+    .item.done{background:linear-gradient(90deg,#343434,#282828);opacity:.64}
+    .item.done .box{background:#6a6a6a;border-color:#aaa}
     .item.done .box::after{transform:rotate(45deg) scale(1)}
-    .item.done .label{text-decoration:line-through;color:#b8c3d3}
+    .item.done .label{text-decoration:line-through;color:#b8b8b8}
     .footer-reset{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);width:min(732px,calc(100% - 28px));z-index:10}
-    .footer-reset button{width:100%;min-height:54px;border:0;border-radius:15px;background:var(--danger);color:#fff;font-size:1rem;font-weight:900;letter-spacing:.02em;box-shadow:0 10px 30px rgba(0,0,0,.38);cursor:pointer}
-    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.66);display:none;align-items:center;justify-content:center;padding:22px;z-index:50}
+    .footer-reset button{width:100%;min-height:54px;border:1px solid #777;border-radius:15px;background:linear-gradient(#5a5a5a,#333);color:#fff;font-size:1rem;font-weight:900;letter-spacing:.04em;box-shadow:0 10px 30px rgba(0,0,0,.5);cursor:pointer}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:center;justify-content:center;padding:22px;z-index:50}
     .modal-backdrop.show{display:flex}
-    .modal{width:min(420px,100%);background:#172238;border:1px solid #344865;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+    .modal{width:min(420px,100%);background:#202020;border:1px solid #666;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.7)}
     .modal h3{margin:0 0 8px;font-size:1.35rem}
     .modal p{margin:0 0 18px;color:var(--muted);line-height:1.45}
     .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .modal-actions button{min-height:48px;border-radius:12px;font-weight:850;font-size:1rem;cursor:pointer}
-    .cancel{border:1px solid #50617c;background:#202d45;color:#fff}
-    .confirm{border:0;background:var(--danger);color:#fff}
-    @media (max-width:430px){.header{align-items:flex-start}.brand img{width:60px;height:60px}.header .reset{display:none}.subtitle{font-size:.76rem}}
+    .cancel{border:1px solid #666;background:#303030;color:#fff}
+    .confirm{border:1px solid #888;background:#555;color:#fff}
+    @media (max-width:430px){.header{align-items:center}.brand img{width:78px;height:78px}.header .reset{display:none}.subtitle{font-size:.76rem}h1{font-size:2rem}}
   </style>
 </head>
 <body>
 <main class="app">
   <header class="header">
     <div class="brand">
-      <img src="/Track_Weather/apple-touch-icon.png" alt="Grassi Racing">
+      <img src="./mustang-icon.png?v=2" alt="Mustang">
       <div><h1>Race List</h1><div class="subtitle">Race day prep & packing checklist</div></div>
     </div>
     <button class="reset" type="button" data-reset>Reset All</button>
