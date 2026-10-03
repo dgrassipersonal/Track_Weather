@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <title>Race Weather</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Drag Racing Weather</p>
+        <h1>Race Weather</h1>
+      </div>
+      <button id="refreshButton" class="ghost-button" type="button">Refresh</button>
+    </header>
+
+    <section class="controls card">
+      <label>
+        <span>Track</span>
+        <select id="trackSelect"></select>
+      </label>
+      <label>
+        <span>Date</span>
+        <input id="dateInput" type="date">
+      </label>
+    </section>
+
+    <section id="statusCard" class="status-card card" aria-live="polite">
+      <div class="status-topline">
+        <div>
+          <p id="trackName" class="eyebrow"></p>
+          <h2 id="decisionText">Loading…</h2>
+        </div>
+        <div class="score-ring" aria-label="Race risk score">
+          <strong id="riskScore">--</strong>
+          <span>/100</span>
+        </div>
+      </div>
+      <p id="summaryText" class="summary-text">Fetching weather for the exact track location.</p>
+      <div class="metric-grid">
+        <div><span>Peak rain</span><strong id="peakPop">--</strong></div>
+        <div><span>Rain total</span><strong id="rainTotal">--</strong></div>
+        <div><span>Drying</span><strong id="dryingIndex">--</strong></div>
+        <div><span>Confidence</span><strong id="confidenceText">--</strong></div>
+        <div><span>Wind</span><strong id="windText">--</strong></div>
+        <div><span>DA @ Noon</span><strong id="daText">--</strong></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Race window</p>
+          <h2>7 AM–7 PM</h2>
+        </div>
+        <span id="lastUpdated" class="muted"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Rain %</th>
+              <th>Rain</th>
+              <th>Temp</th>
+              <th>RH</th>
+              <th>Wind</th>
+              <th>DA</th>
+            </tr>
+          </thead>
+          <tbody id="hourlyBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Source agreement</p>
+          <h2>Forecast consensus</h2>
+        </div>
+      </div>
+      <div id="sourceList" class="source-list"></div>
+      <p class="fine-print">V1 compares the official NWS point forecast with Open-Meteo's multi-model forecast where available. The app does not claim an official cancellation probability; the race-risk score is a transparent racing-weather heuristic.</p>
+    </section>
+
+    <section id="errorBox" class="error-box" hidden></section>
+  </main>
+  <script src="./app.js" defer></script>
+</body>
+</html>
