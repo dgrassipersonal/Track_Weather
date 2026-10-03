@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#233b61">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Race List">
+  <link rel="manifest" href="./manifest.webmanifest?v=1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/Track_Weather/apple-touch-icon.png">
+  <link rel="apple-touch-icon-precomposed" href="/Track_Weather/apple-touch-icon-precomposed.png">
+  <title>Race List</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1020;--panel:#121b2e;--panel2:#18243b;--line:#2b3b59;--text:#f8fafc;--muted:#a9b6ca;--blue:#233b61;--accent:#65a5ff;--done:#1f6a49;--danger:#c63d46}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html{background:var(--bg)}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;background:linear-gradient(180deg,#0d1425 0,#0b1020 100%);color:var(--text);min-height:100vh}
+    .app{width:min(760px,100%);margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 14px calc(env(safe-area-inset-bottom) + 100px)}
+    .header{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--blue);border:1px solid #34527f;border-radius:18px;padding:16px 16px;margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+    .brand{display:flex;align-items:center;gap:12px;min-width:0}
+    .brand img{width:74px;height:74px;border-radius:15px;object-fit:cover;flex:none}
+    h1{font-size:clamp(1.65rem,7vw,2.3rem);line-height:1;margin:0;letter-spacing:-.03em}
+    .subtitle{color:#d6e1f1;font-size:.82rem;margin-top:6px}
+    .reset{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:white;border-radius:12px;padding:11px 13px;font-weight:800;font-size:.88rem;cursor:pointer;white-space:nowrap}
+    .section{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin:0 0 16px;box-shadow:0 8px 24px rgba(0,0,0,.16)}
+    .section h2{margin:0;padding:14px 16px;background:var(--panel2);font-size:1.05rem;letter-spacing:.01em;border-bottom:1px solid var(--line)}
+    .item{display:flex;align-items:center;gap:13px;min-height:58px;padding:10px 15px;border-bottom:1px solid rgba(82,103,137,.34);cursor:pointer;user-select:none;transition:background .12s ease,opacity .12s ease}
+    .item:last-child{border-bottom:0}
+    .item:active{background:#1c2b46}
+    .item input{position:absolute;opacity:0;pointer-events:none}
+    .box{width:28px;height:28px;border:2px solid #6e83a5;border-radius:8px;display:grid;place-items:center;flex:none;background:#0e1729;transition:.12s ease}
+    .box::after{content:"";width:8px;height:14px;border:solid white;border-width:0 3px 3px 0;transform:rotate(45deg) scale(0);margin-top:-3px;transition:.12s ease}
+    .label{font-size:1.04rem;font-weight:650;line-height:1.25}
+    .item.done{background:rgba(31,106,73,.22);opacity:.68}
+    .item.done .box{background:var(--done);border-color:#4db881}
+    .item.done .box::after{transform:rotate(45deg) scale(1)}
+    .item.done .label{text-decoration:line-through;color:#b8c3d3}
+    .footer-reset{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);width:min(732px,calc(100% - 28px));z-index:10}
+    .footer-reset button{width:100%;min-height:54px;border:0;border-radius:15px;background:var(--danger);color:#fff;font-size:1rem;font-weight:900;letter-spacing:.02em;box-shadow:0 10px 30px rgba(0,0,0,.38);cursor:pointer}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.66);display:none;align-items:center;justify-content:center;padding:22px;z-index:50}
+    .modal-backdrop.show{display:flex}
+    .modal{width:min(420px,100%);background:#172238;border:1px solid #344865;border-radius:20px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+    .modal h3{margin:0 0 8px;font-size:1.35rem}
+    .modal p{margin:0 0 18px;color:var(--muted);line-height:1.45}
+    .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .modal-actions button{min-height:48px;border-radius:12px;font-weight:850;font-size:1rem;cursor:pointer}
+    .cancel{border:1px solid #50617c;background:#202d45;color:#fff}
+    .confirm{border:0;background:var(--danger);color:#fff}
+    @media (max-width:430px){.header{align-items:flex-start}.brand img{width:60px;height:60px}.header .reset{display:none}.subtitle{font-size:.76rem}}
+  </style>
+</head>
+<body>
+<main class="app">
+  <header class="header">
+    <div class="brand">
+      <img src="/Track_Weather/apple-touch-icon.png" alt="Grassi Racing">
+      <div><h1>Race List</h1><div class="subtitle">Race day prep & packing checklist</div></div>
+    </div>
+    <button class="reset" type="button" data-reset>Reset All</button>
+  </header>
+  <div id="checklist"></div>
+</main>
+<div class="footer-reset"><button type="button" data-reset>RESET ALL</button></div>
+<div class="modal-backdrop" id="resetModal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+  <div class="modal">
+    <h3 id="resetTitle">Reset entire checklist?</h3>
+    <p>This will clear every checked item and return the race list to a fresh start.</p>
+    <div class="modal-actions">
+      <button class="cancel" id="cancelReset" type="button">Cancel</button>
+      <button class="confirm" id="confirmReset" type="button">Reset All</button>
+    </div>
+  </div>
+</div>
+<script>
+const LISTS=[
+  {title:'To Do',items:['Gas in car','Gas in can','Wash car','Torque Lugs','Air in car tires','Air in trailer tires','Air in trailer spare','Charge impact gun','Charge Inflator','Charge speaker','Charge Radio/replace batteries','Charge Laptop','Fill misting bucket','Set Alarm']},
+  {title:'Pack in Truck',items:['Boards','Spare Tire','Cooler','Radio/Speaker Bag','Laptop','Canopy Frame','Canopy','Trailer Keys','Grill','Gas Can','Propane Cylinder','Mister and bucket']},
+  {title:'Pack in Trailer',items:['Jack','Tool Box','Jack Stands','Trailer Box','Tire Block','Trailer Block','Inflater','Impact Gun','Chairs']},
+  {title:'Pack in Car',items:['Helmet','Fire jacket','Long pants','Pressure gauge','Mustang keys']}
+];
+const STORAGE='grassi-race-list-v1';
+let checked={};
+try{checked=JSON.parse(localStorage.getItem(STORAGE)||'{}')||{}}catch(e){checked={}}
+const root=document.getElementById('checklist');
+function key(section,item){return section+'::'+item}
+function save(){localStorage.setItem(STORAGE,JSON.stringify(checked))}
+function render(){
+  root.innerHTML='';
+  LISTS.forEach(group=>{
+    const section=document.createElement('section'); section.className='section';
+    const h=document.createElement('h2'); h.textContent=group.title; section.appendChild(h);
+    group.items.forEach(item=>{
+      const k=key(group.title,item);
+      const row=document.createElement('label'); row.className='item'+(checked[k]?' done':'');
+      const input=document.createElement('input'); input.type='checkbox'; input.checked=!!checked[k];
+      const box=document.createElement('span'); box.className='box';
+      const label=document.createElement('span'); label.className='label'; label.textContent=item;
+      row.append(input,box,label);
+      row.addEventListener('click',e=>{
+        e.preventDefault();
+        checked[k]=!checked[k];
+        input.checked=checked[k];
+        row.classList.toggle('done',checked[k]);
+        save();
+        if(navigator.vibrate) navigator.vibrate(12);
+      });
+      section.appendChild(row);
+    });
+    root.appendChild(section);
+  });
+}
+render();
+const modal=document.getElementById('resetModal');
+document.querySelectorAll('[data-reset]').forEach(b=>b.addEventListener('click',()=>modal.classList.add('show')));
+document.getElementById('cancelReset').addEventListener('click',()=>modal.classList.remove('show'));
+modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('show')});
+document.getElementById('confirmReset').addEventListener('click',()=>{
+  checked={}; save(); render(); modal.classList.remove('show');
+});
+if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
+</script>
+</body>
+</html>
