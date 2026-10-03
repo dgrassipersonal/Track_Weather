@@ -160,11 +160,27 @@ async function load(){
     const [modelResults,nws]=await Promise.all([Promise.all(modelPromises),getNws(track)]);
     const s=aggregateModels(modelResults),n=nwsForDate(nws,date),conf=confidence(modelResults,n);
     const blended=clamp(Math.round(s.risk*.75+n.peak*.25),0,100);
-    const[v,c]=verdict(blended);
+    const peakPop=Math.max(s.peak,n.peak);
+    const wetSourceCount=modelResults.filter(m=>m.peak>=60||m.total>=.1).length+(n.peak>=60?1:0);
+    let decisionRisk=blended;
+
+    // Drag racing needs a more conservative rain call than a general outdoor forecast.
+    // A 40-59% peak chance can no longer produce a green GO.
+    if(peakPop>=40&&peakPop<60) decisionRisk=Math.max(decisionRisk,35);
+
+    // At 60%+ the forecast is at least a strong CAUTION. If that signal is
+    // supported by measurable model rain, multiple wet race-window hours, or
+    // more than one wet source, promote the call to NO-GO.
+    if(peakPop>=60) decisionRisk=Math.max(decisionRisk,55);
+    if(peakPop>=60&&(s.total>=.05||s.wetHours>=2||wetSourceCount>=2)){
+      decisionRisk=Math.max(decisionRisk,65);
+    }
+
+    const[v,c]=verdict(decisionRisk);
     $('statusCard').className='status-card card '+c;
     $('decisionText').textContent=v;
-    $('riskScore').textContent=blended;
-    $('peakPop').textContent=Math.round(Math.max(s.peak,n.peak))+'%';
+    $('riskScore').textContent=decisionRisk;
+    $('peakPop').textContent=Math.round(peakPop)+'%';
     $('rainTotal').textContent=s.total.toFixed(2)+' in';
     $('dryingIndex').textContent=s.drying+'/100';
     $('confidenceText').textContent=conf;
