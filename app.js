@@ -5,21 +5,194 @@ const TRACKS=[
 {name:'Cecil County Dragway',lat:39.6387,lon:-75.9902},
 {name:'Numidia Dragway',lat:40.8891,lon:-76.4000}
 ];
+const MODELS=[
+{id:'best_match',label:'Open-Meteo Best Match'},
+{id:'gfs_seamless',label:'GFS'},
+{id:'ecmwf_ifs025',label:'ECMWF IFS'}
+];
 const $=id=>document.getElementById(id);
 const trackSelect=$('trackSelect'),dateInput=$('dateInput'),errorBox=$('errorBox');
-function isoDateLocal(d=new Date()){const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);return z.toISOString().slice(0,10)}
-function init(){TRACKS.forEach((t,i)=>{const o=document.createElement('option');o.value=i;o.textContent=t.name;trackSelect.appendChild(o)});dateInput.value=isoDateLocal();dateInput.min=isoDateLocal();const max=new Date();max.setDate(max.getDate()+6);dateInput.max=isoDateLocal(max);trackSelect.addEventListener('change',load);dateInput.addEventListener('change',load);$('refreshButton').addEventListener('click',load);if('serviceWorker'in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});load()}
-async function getOpenMeteo(track,date){const hourly=['temperature_2m','relative_humidity_2m','dew_point_2m','precipitation_probability','precipitation','surface_pressure','wind_speed_10m','wind_gusts_10m','cloud_cover'];const url='https://api.open-meteo.com/v1/forecast?latitude='+track.lat+'&longitude='+track.lon+'&hourly='+hourly.join(',')+'&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&start_date='+date+'&end_date='+date+'&models=best_match,gfs_seamless,ecmwf_ifs025';const r=await fetch(url);if(!r.ok)throw new Error('Open-Meteo request failed');return r.json()}
-async function getNws(track){const p=await fetch('https://api.weather.gov/points/'+track.lat+','+track.lon,{headers:{Accept:'application/geo+json'}});if(!p.ok)throw new Error('NWS point lookup failed');const pd=await p.json();const f=await fetch(pd.properties.forecastHourly,{headers:{Accept:'application/geo+json'}});if(!f.ok)throw new Error('NWS hourly forecast failed');return f.json()}
-function mean(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:0}
+
+function isoDateLocal(d=new Date()){
+  const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);
+  return z.toISOString().slice(0,10);
+}
+function init(){
+  TRACKS.forEach((t,i)=>{
+    const o=document.createElement('option');
+    o.value=i;o.textContent=t.name;trackSelect.appendChild(o);
+  });
+  dateInput.value=isoDateLocal();
+  dateInput.min=isoDateLocal();
+  const max=new Date();max.setDate(max.getDate()+6);dateInput.max=isoDateLocal(max);
+  trackSelect.addEventListener('change',load);
+  dateInput.addEventListener('change',load);
+  $('refreshButton').addEventListener('click',load);
+  if('serviceWorker'in navigator) navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  load();
+}
+async function fetchJson(url,options={}){
+  const r=await fetch(url,options);
+  if(!r.ok) throw new Error('Weather request failed ('+r.status+')');
+  return r.json();
+}
+async function getOpenMeteoModel(track,date,model){
+  const hourly=['temperature_2m','relative_humidity_2m','dew_point_2m','precipitation_probability','precipitation','surface_pressure','wind_speed_10m','wind_gusts_10m','cloud_cover'];
+  const qs=new URLSearchParams({
+    latitude:track.lat,
+    longitude:track.lon,
+    hourly:hourly.join(','),
+    temperature_unit:'fahrenheit',
+    wind_speed_unit:'mph',
+    precipitation_unit:'inch',
+    timezone:'America/New_York',
+    start_date:date,
+    end_date:date,
+    models:model
+  });
+  return fetchJson('https://api.open-meteo.com/v1/forecast?'+qs.toString());
+}
+async function getNws(track){
+  const p=await fetchJson('https://api.weather.gov/points/'+track.lat+','+track.lon,{headers:{Accept:'application/geo+json'}});
+  return fetchJson(p.properties.forecastHourly,{headers:{Accept:'application/geo+json'}});
+}
+function mean(a){const v=a.filter(Number.isFinite);return v.length?v.reduce((x,y)=>x+y,0)/v.length:0}
 function clamp(x,a,b){return Math.max(a,Math.min(b,x))}
-function calcDA(tempF,rh,pressureHpa){if(!Number.isFinite(tempF)||!Number.isFinite(rh)||!Number.isFinite(pressureHpa))return null;const tC=(tempF-32)*5/9;const es=6.112*Math.exp((17.67*tC)/(tC+243.5));const e=es*(rh/100);const pd=pressureHpa-e;const rho=((pd*100)/(287.05*(tC+273.15)))+((e*100)/(461.495*(tC+273.15)));const rho0=1.225;return Math.round((1-Math.pow(rho/rho0,1/5.25588))*145366.45)}
-function raceHours(data,date){const idx=[];data.hourly.time.forEach((t,i)=>{const h=new Date(t).getHours();if(t.startsWith(date)&&h>=7&&h<=19)idx.push(i)});return idx}
-function srcValue(obj,key,i){const v=obj.hourly?.[key]?.[i];return Array.isArray(v)?mean(v.filter(Number.isFinite)):v}
-function summarize(data,date){const ix=raceHours(data,date);const rows=ix.map(i=>({time:data.hourly.time[i],pop:+srcValue(data,'precipitation_probability',i)||0,rain:+srcValue(data,'precipitation',i)||0,temp:+srcValue(data,'temperature_2m',i),rh:+srcValue(data,'relative_humidity_2m',i),dew:+srcValue(data,'dew_point_2m',i),pressure:+srcValue(data,'surface_pressure',i),wind:+srcValue(data,'wind_speed_10m',i)||0,gust:+srcValue(data,'wind_gusts_10m',i)||0,cloud:+srcValue(data,'cloud_cover',i)||0}));const peak=Math.max(0,...rows.map(r=>r.pop));const total=rows.reduce((s,r)=>s+r.rain,0);const wetHours=rows.filter(r=>r.rain>=.01||r.pop>=60).length;const avgRh=mean(rows.map(r=>r.rh).filter(Number.isFinite));const avgWind=mean(rows.map(r=>r.wind));const avgCloud=mean(rows.map(r=>r.cloud));const drying=clamp(Math.round(100-(avgRh*.55)-(avgCloud*.18)+(avgWind*1.4)+mean(rows.map(r=>r.temp))*0.25),0,100);const risk=clamp(Math.round(peak*.42+Math.min(total/.4,1)*32+Math.min(wetHours/5,1)*18+(drying<35?8:0)),0,100);return{rows,peak,total,wetHours,drying,risk}}
-function nwsForDate(nws,date){const ps=nws.properties?.periods||[];const rows=ps.filter(p=>p.startTime.startsWith(date)&&new Date(p.startTime).getHours()>=7&&new Date(p.startTime).getHours()<=19);return{peak:Math.max(0,...rows.map(p=>p.probabilityOfPrecipitation?.value||0)),summary:rows.map(p=>p.shortForecast).filter(Boolean).slice(0,3).join(' / ')}}
+function calcDA(tempF,rh,pressureHpa){
+  if(!Number.isFinite(tempF)||!Number.isFinite(rh)||!Number.isFinite(pressureHpa)) return null;
+  const tC=(tempF-32)*5/9;
+  const es=6.112*Math.exp((17.67*tC)/(tC+243.5));
+  const e=es*(rh/100),pd=pressureHpa-e;
+  const rho=((pd*100)/(287.05*(tC+273.15)))+((e*100)/(461.495*(tC+273.15)));
+  return Math.round((1-Math.pow(rho/1.225,1/5.25588))*145366.45);
+}
+function raceHours(data,date){
+  const idx=[];
+  (data.hourly?.time||[]).forEach((t,i)=>{
+    const h=Number(t.slice(11,13));
+    if(t.startsWith(date)&&h>=7&&h<=19) idx.push(i);
+  });
+  return idx;
+}
+function summarizeModel(data,date,label){
+  const ix=raceHours(data,date);
+  const rows=ix.map(i=>({
+    time:data.hourly.time[i],
+    pop:Number(data.hourly.precipitation_probability?.[i])||0,
+    rain:Number(data.hourly.precipitation?.[i])||0,
+    temp:Number(data.hourly.temperature_2m?.[i]),
+    rh:Number(data.hourly.relative_humidity_2m?.[i]),
+    dew:Number(data.hourly.dew_point_2m?.[i]),
+    pressure:Number(data.hourly.surface_pressure?.[i]),
+    wind:Number(data.hourly.wind_speed_10m?.[i])||0,
+    gust:Number(data.hourly.wind_gusts_10m?.[i])||0,
+    cloud:Number(data.hourly.cloud_cover?.[i])||0
+  }));
+  if(!rows.length) throw new Error(label+' returned no race-window data');
+  const peak=Math.max(...rows.map(r=>r.pop));
+  const total=rows.reduce((s,r)=>s+r.rain,0);
+  const wetHours=rows.filter(r=>r.rain>=.01||r.pop>=60).length;
+  return {label,rows,peak,total,wetHours};
+}
+function aggregateModels(models){
+  const len=Math.min(...models.map(m=>m.rows.length));
+  const rows=[];
+  for(let i=0;i<len;i++){
+    const set=models.map(m=>m.rows[i]);
+    rows.push({
+      time:set[0].time,
+      pop:mean(set.map(r=>r.pop)),
+      rain:mean(set.map(r=>r.rain)),
+      temp:mean(set.map(r=>r.temp)),
+      rh:mean(set.map(r=>r.rh)),
+      dew:mean(set.map(r=>r.dew)),
+      pressure:mean(set.map(r=>r.pressure)),
+      wind:mean(set.map(r=>r.wind)),
+      gust:mean(set.map(r=>r.gust)),
+      cloud:mean(set.map(r=>r.cloud))
+    });
+  }
+  const peak=Math.max(...rows.map(r=>r.pop));
+  const total=rows.reduce((s,r)=>s+r.rain,0);
+  const wetHours=rows.filter(r=>r.rain>=.01||r.pop>=60).length;
+  const avgRh=mean(rows.map(r=>r.rh));
+  const avgWind=mean(rows.map(r=>r.wind));
+  const avgCloud=mean(rows.map(r=>r.cloud));
+  const avgTemp=mean(rows.map(r=>r.temp));
+  const drying=clamp(Math.round(100-(avgRh*.55)-(avgCloud*.18)+(avgWind*1.4)+(avgTemp*.25)),0,100);
+  const risk=clamp(Math.round(peak*.42+Math.min(total/.4,1)*32+Math.min(wetHours/5,1)*18+(drying<35?8:0)),0,100);
+  return {rows,peak,total,wetHours,drying,risk};
+}
+function nwsForDate(nws,date){
+  const rows=(nws.properties?.periods||[]).filter(p=>{
+    const d=p.startTime.slice(0,10),h=new Date(p.startTime).getHours();
+    return d===date&&h>=7&&h<=19;
+  });
+  return {
+    peak:Math.max(0,...rows.map(p=>p.probabilityOfPrecipitation?.value||0)),
+    summary:rows.map(p=>p.shortForecast).filter(Boolean).slice(0,3).join(' / ')
+  };
+}
 function verdict(risk){if(risk<35)return['GO','good'];if(risk<65)return['CAUTION','warn'];return['NO-GO','bad']}
-function fmtTime(s){return new Intl.DateTimeFormat([], {hour:'numeric'}).format(new Date(s))}
-function confidence(open,nws){const delta=Math.abs(open.peak-nws.peak);if(delta<=15)return'High';if(delta<=30)return'Medium';return'Low'}
-async function load(){errorBox.hidden=true;$('decisionText').textContent='Loading…';const track=TRACKS[+trackSelect.value||0],date=dateInput.value;$('trackName').textContent=track.name;try{const [om,nws]=await Promise.all([getOpenMeteo(track,date),getNws(track)]);const s=summarize(om,date),n=nwsForDate(nws,date),conf=confidence(s,n);const blended=clamp(Math.round(s.risk*.75+n.peak*.25),0,100);const[v,c]=verdict(blended);$('statusCard').className='status-card card '+c;$('decisionText').textContent=v;$('riskScore').textContent=blended;$('peakPop').textContent=Math.round(Math.max(s.peak,n.peak))+'%';$('rainTotal').textContent=s.total.toFixed(2)+' in';$('dryingIndex').textContent=s.drying+'/100';$('confidenceText').textContent=conf;const maxWind=Math.max(0,...s.rows.map(r=>r.wind)),maxGust=Math.max(0,...s.rows.map(r=>r.gust));$('windText').textContent=Math.round(maxWind)+' G'+Math.round(maxGust)+' mph';const noon=s.rows.find(r=>new Date(r.time).getHours()===12)||s.rows[0];const da=noon?calcDA(noon.temp,noon.rh,noon.pressure):null;$('daText').textContent=da==null?'--':da.toLocaleString()+' ft';const rainStart=s.rows.find(r=>r.rain>=.01||r.pop>=60);$('summaryText').textContent=(rainStart?'Main weather concern begins around '+fmtTime(rainStart.time)+'. ':'No strong rain signal in the race window. ')+(s.total>=.25?'Expected rainfall is substantial for a dragstrip. ':'')+'NWS peak rain chance is '+n.peak+'%; model-derived peak is '+Math.round(s.peak)+'%.';$('hourlyBody').innerHTML=s.rows.map(r=>'<tr><td>'+fmtTime(r.time)+'</td><td>'+Math.round(r.pop)+'%</td><td>'+r.rain.toFixed(2)+'"</td><td>'+Math.round(r.temp)+'°</td><td>'+Math.round(r.rh)+'%</td><td>'+Math.round(r.wind)+' G'+Math.round(r.gust)+'</td><td>'+((calcDA(r.temp,r.rh,r.pressure)||0).toLocaleString())+'</td></tr>').join('');$('sourceList').innerHTML='<div class="source-row"><div><strong>NWS</strong><small>'+ (n.summary||'Hourly point forecast') +'</small></div><span class="badge">'+n.peak+'% peak</span></div><div class="source-row"><div><strong>Open-Meteo multi-model</strong><small>Best Match + GFS + ECMWF where available</small></div><span class="badge">'+Math.round(s.peak)+'% peak</span></div>';$('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}catch(e){errorBox.hidden=false;errorBox.textContent=e.message+' — try Refresh in a moment.';$('decisionText').textContent='Weather unavailable';}}
+function fmtTime(s){const h=Number(s.slice(11,13));return new Intl.DateTimeFormat([],{hour:'numeric'}).format(new Date(2000,0,1,h))}
+function confidence(models,nws){
+  const peaks=models.map(m=>m.peak).concat(nws.peak);
+  const spread=Math.max(...peaks)-Math.min(...peaks);
+  if(spread<=15)return'High';
+  if(spread<=30)return'Medium';
+  return'Low';
+}
+function consensusLabel(models,nws){
+  const wet=models.filter(m=>m.peak>=60||m.total>=.1).length+(nws.peak>=60?1:0);
+  const total=models.length+1;
+  if(wet===total)return'All sources show meaningful rain risk';
+  if(wet>=Math.ceil(total*.75))return'Most sources show meaningful rain risk';
+  if(wet<=1)return'Most sources are relatively dry';
+  return'Sources are mixed';
+}
+async function load(){
+  errorBox.hidden=true;
+  $('decisionText').textContent='Loading…';
+  const track=TRACKS[+trackSelect.value||0],date=dateInput.value;
+  $('trackName').textContent=track.name;
+  try{
+    const modelPromises=MODELS.map(m=>getOpenMeteoModel(track,date,m.id).then(d=>summarizeModel(d,date,m.label)));
+    const [modelResults,nws]=await Promise.all([Promise.all(modelPromises),getNws(track)]);
+    const s=aggregateModels(modelResults),n=nwsForDate(nws,date),conf=confidence(modelResults,n);
+    const blended=clamp(Math.round(s.risk*.75+n.peak*.25),0,100);
+    const[v,c]=verdict(blended);
+    $('statusCard').className='status-card card '+c;
+    $('decisionText').textContent=v;
+    $('riskScore').textContent=blended;
+    $('peakPop').textContent=Math.round(Math.max(s.peak,n.peak))+'%';
+    $('rainTotal').textContent=s.total.toFixed(2)+' in';
+    $('dryingIndex').textContent=s.drying+'/100';
+    $('confidenceText').textContent=conf;
+    const maxWind=Math.max(...s.rows.map(r=>r.wind)),maxGust=Math.max(...s.rows.map(r=>r.gust));
+    $('windText').textContent=Math.round(maxWind)+' G'+Math.round(maxGust)+' mph';
+    const noon=s.rows.find(r=>r.time.slice(11,13)==='12')||s.rows[0];
+    const da=noon?calcDA(noon.temp,noon.rh,noon.pressure):null;
+    $('daText').textContent=da==null?'--':da.toLocaleString()+' ft';
+    const rainStart=s.rows.find(r=>r.rain>=.01||r.pop>=60);
+    $('summaryText').textContent=
+      (rainStart?'Main weather concern begins around '+fmtTime(rainStart.time)+'. ':'No strong rain signal in the 7 AM–7 PM race window. ')+
+      consensusLabel(modelResults,n)+'. '+
+      (s.total>=.25?'Model-average rainfall is substantial for a dragstrip. ':'')+
+      'NWS peak rain chance is '+n.peak+'%; model-consensus peak is '+Math.round(s.peak)+'%.';
+    $('hourlyBody').innerHTML=s.rows.map(r=>{
+      const daHr=calcDA(r.temp,r.rh,r.pressure);
+      return '<tr><td>'+fmtTime(r.time)+'</td><td>'+Math.round(r.pop)+'%</td><td>'+r.rain.toFixed(2)+'"</td><td>'+Math.round(r.temp)+'°</td><td>'+Math.round(r.rh)+'%</td><td>'+Math.round(r.wind)+' G'+Math.round(r.gust)+'</td><td>'+(daHr==null?'--':daHr.toLocaleString())+'</td></tr>';
+    }).join('');
+    const modelHtml=modelResults.map(m=>
+      '<div class="source-row"><div><strong>'+m.label+'</strong><small>'+m.total.toFixed(2)+'" model rainfall</small></div><span class="badge">'+Math.round(m.peak)+'% peak</span></div>'
+    ).join('');
+    $('sourceList').innerHTML=
+      '<div class="source-row"><div><strong>NWS</strong><small>'+(n.summary||'Official hourly point forecast')+'</small></div><span class="badge">'+n.peak+'% peak</span></div>'+modelHtml;
+    $('lastUpdated').textContent='Updated '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  }catch(e){
+    errorBox.hidden=false;
+    errorBox.textContent=e.message+' — try Refresh in a moment.';
+    $('decisionText').textContent='Weather unavailable';
+  }
+}
 init();
