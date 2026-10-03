@@ -1,9 +1,13 @@
 {
-  "name": "Race Weather",
-  "short_name": "Race Weather",
+  "name": "Race Day Forecaster",
+  "short_name": "Race Day",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0b1020",
-  "theme_color": "#111827",
-  "icons": [{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+  "theme_color": "#233b61",
+  "icons": [
+    {"src":"./apple-touch-icon-v2.png","sizes":"180x180","type":"image/png","purpose":"any"},
+    {"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}
+  ]
 }
