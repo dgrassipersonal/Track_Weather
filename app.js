@@ -145,7 +145,7 @@ function raceHours(data,date){
   });
   return idx;
 }
-function summarizeModel(data,date,label){
+function summarizeModel(data,date,label,id){
   const ix=raceHours(data,date);
   const rows=ix.map(i=>({
     time:data.hourly.time[i],
@@ -163,7 +163,7 @@ function summarizeModel(data,date,label){
   const peak=Math.max(...rows.map(r=>r.pop));
   const total=rows.reduce((s,r)=>s+r.rain,0);
   const wetHours=rows.filter(r=>r.rain>=.01||r.pop>=60).length;
-  return {id:arguments[3],label,rows,peak,total,wetHours};
+  return {id,label,rows,peak,total,wetHours};
 }
 function aggregateModels(models,skillWeights){
   const len=Math.min(...models.map(m=>m.rows.length));
