@@ -12,9 +12,12 @@
 <body>
   <main class="app-shell">
     <header class="app-header">
-      <div>
-        <p class="eyebrow">Drag Racing Weather</p>
-        <h1>Race Weather</h1>
+      <div class="brand-wrap">
+        <img src="./icon.svg" alt="" class="header-image">
+        <div>
+          <p class="eyebrow">Drag Racing Weather</p>
+          <h1>Race Weather</h1>
+        </div>
       </div>
       <button id="refreshButton" class="ghost-button" type="button">Refresh</button>
     </header>
@@ -86,7 +89,6 @@
         </div>
       </div>
       <div id="sourceList" class="source-list"></div>
-      <p class="fine-print">V1 compares the official NWS point forecast with Open-Meteo's multi-model forecast where available. The app does not claim an official cancellation probability; the race-risk score is a transparent racing-weather heuristic.</p>
     </section>
 
     <section id="errorBox" class="error-box" hidden></section>
